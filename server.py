@@ -8,6 +8,11 @@ app = Flask(__name__)
 CORS(app)
 yt = YTMusic()
 
+@app.route('/')
+def home():
+    return "Backend is running!"
+
+
 @app.route('/search')
 def search():
     query = request.args.get('q')
