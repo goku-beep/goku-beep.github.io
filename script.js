@@ -1,4 +1,4 @@
-const BASE_URL = "goku-beep-github-io.vercel.app";
+const BASE_URL = "https://goku-beep-github-io.vercel.app";
 let currentQueue = [];
 let currentIndex = -1;
 let playbackHistory = []; 
