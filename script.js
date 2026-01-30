@@ -1,18 +1,47 @@
-const BASE_URL = "https://goku-beep-github-io.vercel.app";
+const BASE_URL = "https://goku-beep-github-io.vercel.app"; // Double-check this matches Vercel!
 let currentQueue = [];
 let currentIndex = -1;
-let playbackHistory = []; 
+let nextSuggestedSong = null;
+let playbackHistory = [];
+
+// Helper to show detailed errors on the screen
+function showDebug(msg, error = null) {
+    const statusDiv = document.getElementById('debugStatus');
+    let detailedError = msg;
+    if (error) {
+        // Captures network errors like CORS or DNS issues
+        detailedError += ` | Details: ${error.message || error}`;
+    }
+    statusDiv.innerText = detailedError;
+    console.error("DEBUG:", detailedError);
+}
 
 async function searchSong() {
     const query = document.getElementById('searchBar').value;
     const resultsDiv = document.getElementById('results');
+    const statusDiv = document.getElementById('debugStatus');
+    
     if(!query) return;
 
     resultsDiv.innerHTML = "Searching...";
+    statusDiv.innerText = ""; // Clear previous errors
+
     try {
         const response = await fetch(`${BASE_URL}/search?q=${query}`);
+        
+        // If the server answered but with an error (404, 500, etc.)
+        if (!response.ok) {
+            showDebug(`Server Error: ${response.status} ${response.statusText}`);
+            resultsDiv.innerHTML = "";
+            return;
+        }
+
         currentQueue = await response.json();
         resultsDiv.innerHTML = "";
+
+        if (currentQueue.length === 0) {
+            showDebug("No results found. Try a different name.");
+        }
 
         currentQueue.forEach((song, index) => {
             resultsDiv.innerHTML += `
@@ -25,33 +54,33 @@ async function searchSong() {
                     <button class="play-item-btn" onclick="playAtIndex(${index})">▶</button>
                 </div>`;
         });
-    } catch (e) { resultsDiv.innerHTML = "Server Offline. Check Termux."; }
+    } catch (e) {
+        // This triggers if the URL is wrong, the server is down, or CORS blocks it
+        showDebug("Network Failure. Check if URL is correct or if CORS is enabled.", e);
+        resultsDiv.innerHTML = "";
+    }
 }
 
 async function playAtIndex(index, isObject = false) {
-    let song;
-    if (isObject) {
-        song = index; 
-    } else {
-        if (index < 0 || index >= currentQueue.length) return;
-        currentIndex = index;
-        song = currentQueue[index];
-    }
-    
+    let song = isObject ? index : currentQueue[index];
+    if (!isObject) currentIndex = index;
+
     document.getElementById('nowPlaying').innerText = "Loading...";
     document.getElementById('nowArtist').innerText = song.artist;
     document.getElementById('trackArt').src = song.artwork;
+    document.getElementById('debugStatus').innerText = "";
 
     try {
         const response = await fetch(`${BASE_URL}/get_audio?id=${song.videoId}`);
-        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(`Audio Fetch Failed (${response.status})`);
+        }
 
+        const data = await response.json();
         if (data.url) {
             const player = document.getElementById('audioPlayer');
-            
-            player.pause();
             player.src = data.url;
-            player.load();
             player.play();
             
             document.getElementById('playBtn').innerText = "❚❚";
@@ -61,72 +90,15 @@ async function playAtIndex(index, isObject = false) {
                 playbackHistory.push(song);
             }
             
+            prepareAutoplay(song.videoId);
             fetchLyrics(song.title, song.artist);
         }
     } catch (e) {
-        document.getElementById('nowPlaying').innerText = "Playback Error";
+        showDebug("Playback Error", e);
+        document.getElementById('nowPlaying').innerText = "Error Loading Audio";
     }
 }
 
-function playNext() {
-    // Just plays the next song in your search results
-    if (currentIndex < currentQueue.length - 1) {
-        playAtIndex(currentIndex + 1);
-    }
-}
-
-function playPrevious() {
-    if (playbackHistory.length > 1) {
-        playbackHistory.pop(); 
-        const prevSong = playbackHistory.pop(); 
-        playAtIndex(prevSong, true); 
-    } else {
-        const player = document.getElementById('audioPlayer');
-        player.currentTime = 0;
-        player.play();
-    }
-}
-
-function togglePlay() {
-    const player = document.getElementById('audioPlayer');
-    const btn = document.getElementById('playBtn');
-    if (player.paused) {
-        player.play();
-        btn.innerText = "❚❚";
-    } else {
-        player.pause();
-        btn.innerText = "▶";
-    }
-}
-
-function updateProgress() {
-    const player = document.getElementById('audioPlayer');
-    const bar = document.getElementById('progressBar');
-    if (player.duration) {
-        const percentage = (player.currentTime / player.duration) * 100;
-        bar.style.width = percentage + "%";
-    }
-}
-
-function seek(event) {
-    const player = document.getElementById('audioPlayer');
-    const bar = event.currentTarget;
-    const rect = bar.getBoundingClientRect();
-    const offsetX = event.clientX - rect.left;
-    const percentage = offsetX / rect.width;
-    player.currentTime = percentage * player.duration;
-}
-
-async function fetchLyrics(track, artist) {
-    const content = document.getElementById('lyricsContent');
-    content.innerText = "Loading lyrics...";
-    try {
-        const res = await fetch(`${BASE_URL}/get_lyrics?track=${encodeURIComponent(track)}&artist=${encodeURIComponent(artist)}`);
-        const data = await res.json();
-        content.innerText = data.plainLyrics || "Lyrics not found.";
-    } catch(e) { content.innerText = "Lyrics offline."; }
-}
-
-function toggleLyrics() {
-    document.getElementById('lyricsOverlay').classList.toggle('active');
+// ... Keep your other functions (prepareAutoplay, playNext, playPrevious, togglePlay, etc.) ...
+e');
 }
