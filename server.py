@@ -77,5 +77,8 @@ def get_suggestions():
         print(f"Suggestion Error: {e}")
         return jsonify([])
 
+# Vercel will look for the 'app' object and run it automatically.
+# This block ensures it only runs manually when you are on Termux/Local.
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(debug=True)
+    
